@@ -1,6 +1,6 @@
 "use strict";
 /**
- * touch.ts 8.3.0-dev
+ * touch.ts 10.3.1-dev
  * Copyright (c) 2021 Alain Dumesny - see GridStack root license
  */
 Object.defineProperty(exports, "__esModule", { value: true });
@@ -156,6 +156,8 @@ exports.touchend = touchend;
  */
 function pointerdown(e) {
     // console.log("pointer down")
+    if (e.pointerType === 'mouse')
+        return;
     e.target.releasePointerCapture(e.pointerId); // <- Important!
 }
 exports.pointerdown = pointerdown;
@@ -166,6 +168,8 @@ function pointerenter(e) {
         return;
     }
     // console.log('pointerenter');
+    if (e.pointerType === 'mouse')
+        return;
     simulatePointerMouseEvent(e, 'mouseenter');
 }
 exports.pointerenter = pointerenter;
@@ -176,6 +180,8 @@ function pointerleave(e) {
         // console.log('pointerleave ignored');
         return;
     }
+    if (e.pointerType === 'mouse')
+        return;
     DDTouch.pointerLeaveTimeout = window.setTimeout(function () {
         delete DDTouch.pointerLeaveTimeout;
         // console.log('pointerleave delayed');

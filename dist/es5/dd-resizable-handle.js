@@ -1,32 +1,32 @@
 "use strict";
 /**
- * dd-resizable-handle.ts 8.3.0-dev
+ * dd-resizable-handle.ts 10.3.1-dev
  * Copyright (c) 2021-2022 Alain Dumesny - see GridStack root license
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.DDResizableHandle = void 0;
 var dd_touch_1 = require("./dd-touch");
 var DDResizableHandle = exports.DDResizableHandle = /** @class */ (function () {
-    function DDResizableHandle(host, direction, option) {
+    function DDResizableHandle(host, dir, option) {
+        this.host = host;
+        this.dir = dir;
+        this.option = option;
         /** @internal true after we've moved enough pixels to start a resize */
         this.moving = false;
-        this.host = host;
-        this.dir = direction;
-        this.option = option;
         // create var event binding so we can easily remove and still look like TS methods (unlike anonymous functions)
         this._mouseDown = this._mouseDown.bind(this);
         this._mouseMove = this._mouseMove.bind(this);
         this._mouseUp = this._mouseUp.bind(this);
+        this._keyEvent = this._keyEvent.bind(this);
         this._init();
     }
     /** @internal */
     DDResizableHandle.prototype._init = function () {
-        var el = document.createElement('div');
+        var el = this.el = document.createElement('div');
         el.classList.add('ui-resizable-handle');
         el.classList.add("".concat(DDResizableHandle.prefix).concat(this.dir));
         el.style.zIndex = '100';
         el.style.userSelect = 'none';
-        this.el = el;
         this.host.appendChild(this.el);
         this.el.addEventListener('mousedown', this._mouseDown);
         if (dd_touch_1.isTouch) {
@@ -53,7 +53,7 @@ var DDResizableHandle = exports.DDResizableHandle = /** @class */ (function () {
     /** @internal called on mouse down on us: capture move on the entire document (mouse might not stay on us) until we release the mouse */
     DDResizableHandle.prototype._mouseDown = function (e) {
         this.mouseDownEvent = e;
-        document.addEventListener('mousemove', this._mouseMove, true); // capture, not bubble
+        document.addEventListener('mousemove', this._mouseMove, { capture: true, passive: true }); // capture, not bubble
         document.addEventListener('mouseup', this._mouseUp, true);
         if (dd_touch_1.isTouch) {
             this.el.addEventListener('touchmove', dd_touch_1.touchmove);
@@ -73,14 +73,17 @@ var DDResizableHandle = exports.DDResizableHandle = /** @class */ (function () {
             this.moving = true;
             this._triggerEvent('start', this.mouseDownEvent);
             this._triggerEvent('move', e);
+            // now track keyboard events to cancel
+            document.addEventListener('keydown', this._keyEvent);
         }
         e.stopPropagation();
-        e.preventDefault();
+        // e.preventDefault(); passive = true
     };
     /** @internal */
     DDResizableHandle.prototype._mouseUp = function (e) {
         if (this.moving) {
             this._triggerEvent('stop', e);
+            document.removeEventListener('keydown', this._keyEvent);
         }
         document.removeEventListener('mousemove', this._mouseMove, true);
         document.removeEventListener('mouseup', this._mouseUp, true);
@@ -92,6 +95,14 @@ var DDResizableHandle = exports.DDResizableHandle = /** @class */ (function () {
         delete this.mouseDownEvent;
         e.stopPropagation();
         e.preventDefault();
+    };
+    /** @internal call when keys are being pressed - use Esc to cancel */
+    DDResizableHandle.prototype._keyEvent = function (e) {
+        var _a, _b;
+        if (e.key === 'Escape') {
+            (_b = (_a = this.host.gridstackNode) === null || _a === void 0 ? void 0 : _a.grid) === null || _b === void 0 ? void 0 : _b.engine.restoreInitial();
+            this._mouseUp(this.mouseDownEvent);
+        }
     };
     /** @internal */
     DDResizableHandle.prototype._triggerEvent = function (name, event) {

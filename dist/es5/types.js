@@ -1,6 +1,6 @@
 "use strict";
 /**
- * types.ts 8.3.0-dev
+ * types.ts 10.3.1-dev
  * Copyright (c) 2021 Alain Dumesny - see GridStack root license
  */
 Object.defineProperty(exports, "__esModule", { value: true });
@@ -21,22 +21,20 @@ exports.gridDefaults = {
     marginUnit: 'px',
     maxRow: 0,
     minRow: 0,
-    oneColumnSize: 768,
     placeholderClass: 'grid-stack-placeholder',
     placeholderText: '',
-    removableOptions: { accept: '.grid-stack-item' },
+    removableOptions: { accept: 'grid-stack-item', decline: 'grid-stack-non-removable' },
     resizable: { handles: 'se' },
     rtl: 'auto',
     // **** same as not being set ****
     // disableDrag: false,
-    // disableOneColumnMode: false,
     // disableResize: false,
     // float: false,
     // handleClass: null,
-    // oneColumnModeDomSort: false,
     // removable: false,
     // staticGrid: false,
     // styleInHead: false,
+    //removable
 };
 /** default dragIn options */
 exports.dragInDefaultOptions = {

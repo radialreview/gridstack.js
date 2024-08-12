@@ -7,7 +7,7 @@ import * as i1 from '@angular/common';
 import { CommonModule } from '@angular/common';
 
 /**
- * gridstack-item.component.ts 8.3.0-dev
+ * gridstack-item.component.ts 10.3.1-dev
  * Copyright (c) 2022 Alain Dumesny - see GridStack root license
  */
 /**
@@ -73,7 +73,7 @@ i0.ɵɵngDeclareClassMetadata({ minVersion: "12.0.0", version: "14.3.0", ngImpor
             }] } });
 
 /**
- * gridstack.component.ts 8.3.0-dev
+ * gridstack.component.ts 10.3.1-dev
  * Copyright (c) 2022 Alain Dumesny - see GridStack root license
  */
 /**
@@ -285,14 +285,16 @@ function gsCreateNgComponents(host, w, add, isGrid) {
                 return;
             gridItem.ref = gridItemRef;
             // IFF we're not a subGrid, define what type of component to create as child, OR you can do it GridstackItemComponent template, but this is more generic
-            const selector = w.selector;
-            const type = selector ? GridstackComponent.selectorToType[selector] : undefined;
-            if (!w.subGridOpts && type) {
-                const childWidget = gridItem.container?.createComponent(type)?.instance;
-                if (typeof childWidget?.serialize === 'function' && typeof childWidget?.deserialize === 'function') {
-                    // proper BaseWidget subclass, save it and load additional data
-                    gridItem.childWidget = childWidget;
-                    childWidget.deserialize(w);
+            if (!w.subGridOpts) {
+                const selector = w.selector;
+                const type = selector ? GridstackComponent.selectorToType[selector] : undefined;
+                if (type) {
+                    const childWidget = gridItem.container?.createComponent(type)?.instance;
+                    // if proper BaseWidget subclass, save it and load additional data
+                    if (childWidget && typeof childWidget.serialize === 'function' && typeof childWidget.deserialize === 'function') {
+                        gridItem.childWidget = childWidget;
+                        childWidget.deserialize(w);
+                    }
                 }
             }
             return gridItem.el;
@@ -344,7 +346,7 @@ function gsSaveAdditionalNgInfo(n, w) {
 }
 
 /**
- * gridstack-item.component.ts 8.3.0-dev
+ * gridstack-item.component.ts 10.3.1-dev
  * Copyright (c) 2022 Alain Dumesny - see GridStack root license
  */
 class BaseWidget {
@@ -369,7 +371,7 @@ i0.ɵɵngDeclareClassMetadata({ minVersion: "12.0.0", version: "14.3.0", ngImpor
         }] });
 
 /**
- * gridstack.component.ts 8.3.0-dev
+ * gridstack.component.ts 10.3.1-dev
  * Copyright (c) 2022 Alain Dumesny - see GridStack root license
  */
 class GridstackModule {

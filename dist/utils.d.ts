@@ -1,11 +1,17 @@
 /**
- * utils.ts 8.3.0-dev
+ * utils.ts 10.3.1-dev
  * Copyright (c) 2021 Alain Dumesny - see GridStack root license
  */
 import { GridStackElement, GridStackNode, GridStackOptions, numberOrString, GridStackPosition, GridStackWidget } from './types';
 export interface HeightData {
     h: number;
     unit: string;
+}
+export interface DragTransform {
+    xScale: number;
+    yScale: number;
+    xOffset: number;
+    yOffset: number;
 }
 /** checks for obsolete method names */
 export declare function obsolete(self: any, f: any, oldName: string, newName: string, rev: string): (...args: any[]) => any;
@@ -23,6 +29,8 @@ export declare class Utils {
     static getElements(els: GridStackElement, root?: HTMLElement | Document): HTMLElement[];
     /** convert a potential selector into actual single element. optional root which defaults to document (for shadow dom) */
     static getElement(els: GridStackElement, root?: HTMLElement | Document): HTMLElement;
+    /** true if we should resize to content. strict=true when only 'sizeToContent:true' and not a number which lets user adjust */
+    static shouldSizeToContent(n: GridStackNode | undefined, strict?: boolean): boolean;
     /** returns true if a and b overlap */
     static isIntercepted(a: GridStackPosition, b: GridStackPosition): boolean;
     /** returns true if a and b touch edges or corners */
@@ -34,10 +42,11 @@ export declare class Utils {
     /**
      * Sorts array of nodes
      * @param nodes array to sort
-     * @param dir 1 for asc, -1 for desc (optional)
-     * @param width width of the grid. If undefined the width will be calculated automatically (optional).
+     * @param dir 1 for ascending, -1 for descending (optional)
      **/
-    static sort(nodes: GridStackNode[], dir?: 1 | -1, column?: number): GridStackNode[];
+    static sort(nodes: GridStackNode[], dir?: 1 | -1): GridStackNode[];
+    /** find an item by id */
+    static find(nodes: GridStackNode[], id: string): GridStackNode | undefined;
     /**
      * creates a style sheet with style id under given parent
      * @param id will set the 'gs-style-id' attribute to that id
@@ -48,7 +57,7 @@ export declare class Utils {
         nonce?: string;
     }): CSSStyleSheet;
     /** removed the given stylesheet id */
-    static removeStylesheet(id: string): void;
+    static removeStylesheet(id: string, parent?: HTMLElement): void;
     /** inserts a CSS rule */
     static addCSSRule(sheet: CSSStyleSheet, selector: string, rules: string): void;
     static toBool(v: unknown): boolean;
@@ -69,7 +78,6 @@ export declare class Utils {
     /** removes internal fields '_' and default values for saving */
     static removeInternalForSave(n: GridStackNode, removeEl?: boolean): void;
     /** return the closest parent (or itself) matching the given class */
-    static closestUpByClass(el: HTMLElement, name: string): HTMLElement;
     /** delay calling the given function for given delay, preventing new calls from happening while waiting */
     static throttle(func: () => void, delay: number): () => void;
     static removePositioningStyles(el: HTMLElement): void;
@@ -92,4 +100,14 @@ export declare class Utils {
     }): T;
     /** copies the MouseEvent properties and sends it as another event to the given target */
     static simulateMouseEvent(e: MouseEvent, simulatedType: string, target?: EventTarget): void;
+    /**
+     * defines an element that is used to get the offset and scale from grid transforms
+     * returns the scale and offsets from said element
+    */
+    static getValuesFromTransformedElement(parent: HTMLElement): DragTransform;
+    /** swap the given object 2 field values */
+    static swap(o: unknown, a: string, b: string): void;
+    /** returns true if event is inside the given element rectangle */
+    /** true if the item can be rotated (checking for prop, not space available) */
+    static canBeRotated(n: GridStackNode): boolean;
 }
