@@ -1,5 +1,5 @@
 /**
- * touch.ts 8.3.0-dev
+ * touch.ts 10.3.1-dev
  * Copyright (c) 2021 Alain Dumesny - see GridStack root license
  */
 
@@ -175,6 +175,7 @@ export function touchend(e: TouchEvent): void {
  */
 export function pointerdown(e: PointerEvent): void {
   // console.log("pointer down")
+  if (e.pointerType === 'mouse') return;
   (e.target as HTMLElement).releasePointerCapture(e.pointerId) // <- Important!
 }
 
@@ -185,6 +186,7 @@ export function pointerenter(e: PointerEvent): void {
     return;
   }
   // console.log('pointerenter');
+  if (e.pointerType === 'mouse') return;
   simulatePointerMouseEvent(e, 'mouseenter');
 }
 
@@ -195,6 +197,7 @@ export function pointerleave(e: PointerEvent): void {
     // console.log('pointerleave ignored');
     return;
   }
+  if (e.pointerType === 'mouse') return;
   DDTouch.pointerLeaveTimeout = window.setTimeout(() => {
     delete DDTouch.pointerLeaveTimeout;
     // console.log('pointerleave delayed');

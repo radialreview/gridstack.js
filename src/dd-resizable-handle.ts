@@ -1,9 +1,10 @@
 /**
- * dd-resizable-handle.ts 8.3.0-dev
+ * dd-resizable-handle.ts 10.3.1-dev
  * Copyright (c) 2021-2022 Alain Dumesny - see GridStack root license
  */
 
 import { isTouch, pointerdown, touchend, touchmove, touchstart } from './dd-touch';
+import { GridItemHTMLElement } from './gridstack';
 
 export interface DDResizableHandleOpt {
   start?: (event) => void;
@@ -14,12 +15,6 @@ export interface DDResizableHandleOpt {
 export class DDResizableHandle {
   /** @internal */
   protected el: HTMLElement;
-  /** @internal */
-  protected host: HTMLElement;
-  /** @internal */
-  protected option: DDResizableHandleOpt;
-  /** @internal */
-  protected dir: string;
   /** @internal true after we've moved enough pixels to start a resize */
   protected moving = false;
   /** @internal */
@@ -27,26 +22,23 @@ export class DDResizableHandle {
   /** @internal */
   protected static prefix = 'ui-resizable-';
 
-  constructor(host: HTMLElement, direction: string, option: DDResizableHandleOpt) {
-    this.host = host;
-    this.dir = direction;
-    this.option = option;
+  constructor(protected host: GridItemHTMLElement, protected dir: string, protected option: DDResizableHandleOpt) {
     // create var event binding so we can easily remove and still look like TS methods (unlike anonymous functions)
     this._mouseDown = this._mouseDown.bind(this);
     this._mouseMove = this._mouseMove.bind(this);
     this._mouseUp = this._mouseUp.bind(this);
+    this._keyEvent = this._keyEvent.bind(this);
 
     this._init();
   }
 
   /** @internal */
   protected _init(): DDResizableHandle {
-    const el = document.createElement('div');
+    const el = this.el = document.createElement('div');
     el.classList.add('ui-resizable-handle');
     el.classList.add(`${DDResizableHandle.prefix}${this.dir}`);
     el.style.zIndex = '100';
     el.style.userSelect = 'none';
-    this.el = el;
     this.host.appendChild(this.el);
     this.el.addEventListener('mousedown', this._mouseDown);
     if (isTouch) {
@@ -74,7 +66,7 @@ export class DDResizableHandle {
   /** @internal called on mouse down on us: capture move on the entire document (mouse might not stay on us) until we release the mouse */
   protected _mouseDown(e: MouseEvent): void {
     this.mouseDownEvent = e;
-    document.addEventListener('mousemove', this._mouseMove, true); // capture, not bubble
+    document.addEventListener('mousemove', this._mouseMove, { capture: true, passive: true}); // capture, not bubble
     document.addEventListener('mouseup', this._mouseUp, true);
     if (isTouch) {
       this.el.addEventListener('touchmove', touchmove);
@@ -94,15 +86,18 @@ export class DDResizableHandle {
       this.moving = true;
       this._triggerEvent('start', this.mouseDownEvent);
       this._triggerEvent('move', e);
+      // now track keyboard events to cancel
+      document.addEventListener('keydown', this._keyEvent);
     }
     e.stopPropagation();
-    e.preventDefault();
+    // e.preventDefault(); passive = true
   }
 
   /** @internal */
   protected _mouseUp(e: MouseEvent): void {
     if (this.moving) {
       this._triggerEvent('stop', e);
+      document.removeEventListener('keydown', this._keyEvent);
     }
     document.removeEventListener('mousemove', this._mouseMove, true);
     document.removeEventListener('mouseup', this._mouseUp, true);
@@ -116,6 +111,16 @@ export class DDResizableHandle {
     e.preventDefault();
   }
 
+  /** @internal call when keys are being pressed - use Esc to cancel */
+  protected _keyEvent(e: KeyboardEvent): void {
+    if (e.key === 'Escape') {
+      this.host.gridstackNode?.grid?.engine.restoreInitial();
+      this._mouseUp(this.mouseDownEvent);
+    }
+  }
+    
+  
+  
   /** @internal */
   protected _triggerEvent(name: string, event: MouseEvent): DDResizableHandle {
     if (this.option[name]) this.option[name](event);
