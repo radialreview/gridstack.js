@@ -2435,6 +2435,7 @@ var GridStack = exports.GridStack = /** @class */ (function () {
     };
     /** @internal handles actual drag/resize */
     GridStack.prototype._dragOrResize = function (el, event, ui, node, cellWidth, cellHeight) {
+        var _a;
         var p = __assign({}, node._orig); // could be undefined (_isExternal) which is ok (drag only set x,y and w,h will default to node value)
         var resizing;
         var mLeft = this.opts.marginLeft, mRight = this.opts.marginRight, mTop = this.opts.marginTop, mBottom = this.opts.marginBottom;
@@ -2453,7 +2454,7 @@ var GridStack = exports.GridStack = /** @class */ (function () {
                 utils_1.Utils.updateScrollPosition(el, ui.position, distance);
             }
             // get new position taking into account the margin in the direction we are moving! (need to pass mid point by margin)
-            var left = ui.position.left + (ui.position.left > node._lastUiPosition.left ? -mRight : mLeft);
+            var left = ui.position.left + (ui.position.left > ((_a = node._lastUiPosition) === null || _a === void 0 ? void 0 : _a.left) ? -mRight : mLeft);
             var top_2 = ui.position.top + (ui.position.top > node._lastUiPosition.top ? -mBottom : mTop);
             p.x = Math.round(left / cellWidth);
             p.y = Math.round(top_2 / cellHeight);
