@@ -1,5 +1,5 @@
 /**
- * utils.ts 8.3.0-dev
+ * utils.ts 10.3.1-dev
  * Copyright (c) 2021 Alain Dumesny - see GridStack root license
  */
 
@@ -8,6 +8,13 @@ import { GridStackElement, GridStackNode, GridStackOptions, numberOrString, Grid
 export interface HeightData {
   h: number;
   unit: string;
+}
+
+export interface DragTransform {
+  xScale: number;
+  yScale: number;
+  xOffset: number;
+  yOffset: number;
 }
 
 /** checks for obsolete method names */
@@ -102,6 +109,13 @@ export class Utils {
     return els;
   }
 
+  /** true if we should resize to content. strict=true when only 'sizeToContent:true' and not a number which lets user adjust */
+  static shouldSizeToContent(n: GridStackNode | undefined, strict = false): boolean {
+    return n?.grid && (strict ?
+      (n.sizeToContent === true || (n.grid.opts.sizeToContent === true && n.sizeToContent === undefined)) :
+      (!!n.sizeToContent || (n.grid.opts.sizeToContent && n.sizeToContent !== false)));
+  }
+
   /** returns true if a and b overlap */
   static isIntercepted(a: GridStackPosition, b: GridStackPosition): boolean {
     return !(a.y >= b.y + b.h || a.y + a.h <= b.y || a.x + a.w <= b.x || a.x >= b.x + b.w);
@@ -131,15 +145,20 @@ export class Utils {
   /**
    * Sorts array of nodes
    * @param nodes array to sort
-   * @param dir 1 for asc, -1 for desc (optional)
-   * @param width width of the grid. If undefined the width will be calculated automatically (optional).
+   * @param dir 1 for ascending, -1 for descending (optional)
    **/
-  static sort(nodes: GridStackNode[], dir: 1 | -1 = 1, column?: number): GridStackNode[] {
-    column = column || nodes.reduce((col, n) => Math.max(n.x + n.w, col), 0) || 12;
-    if (dir === -1)
-      return nodes.sort((a, b) => (b.x + b.y * column)-(a.x + a.y * column));
-    else
-      return nodes.sort((b, a) => (b.x + b.y * column)-(a.x + a.y * column));
+  static sort(nodes: GridStackNode[], dir: 1 | -1 = 1): GridStackNode[] {
+    const und = 10000;
+    return nodes.sort((a, b) => {
+      let diffY = dir * ((a.y ?? und) - (b.y ?? und));
+      if (diffY === 0) return dir * ((a.x ?? und) - (b.x ?? und));
+      return diffY;
+    });
+  }
+
+  /** find an item by id */
+  static find(nodes: GridStackNode[], id: string): GridStackNode | undefined {
+    return id ? nodes.find(n => n.id === id) : undefined;
   }
 
   /**
@@ -172,8 +191,9 @@ export class Utils {
   }
 
   /** removed the given stylesheet id */
-  static removeStylesheet(id: string): void {
-    let el = document.querySelector('STYLE[gs-style-id=' + id + ']');
+  static removeStylesheet(id: string, parent?: HTMLElement): void {
+    const target = parent || document;
+    let el = target.querySelector('STYLE[gs-style-id=' + id + ']');
     if (el && el.parentNode) el.remove();
   }
 
@@ -206,12 +226,15 @@ export class Utils {
     let h: number;
     let unit = 'px';
     if (typeof val === 'string') {
-      let match = val.match(/^(-[0-9]+\.[0-9]+|[0-9]*\.[0-9]+|-[0-9]+|[0-9]+)(px|em|rem|vh|vw|%)?$/);
-      if (!match) {
-        throw new Error('Invalid height');
+      if (val === 'auto' || val === '') h = 0;
+      else {
+        let match = val.match(/^(-[0-9]+\.[0-9]+|[0-9]*\.[0-9]+|-[0-9]+|[0-9]+)(px|em|rem|vh|vw|%|cm|mm)?$/);
+        if (!match) {
+          throw new Error(`Invalid height val = ${val}`);
+        }
+        unit = match[2] || 'px';
+        h = parseFloat(match[1]);
       }
-      unit = match[2] || 'px';
-      h = parseFloat(match[1]);
     } else {
       h = val;
     }
@@ -266,7 +289,7 @@ export class Utils {
 
   /** true if a and b has same size & position */
   static samePos(a: GridStackPosition, b: GridStackPosition): boolean {
-    return a && b && a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
+    return a && b && a.x === b.x && a.y === b.y && (a.w || 1) === (b.w || 1) && (a.h || 1) === (b.h || 1);
   }
 
   /** given a node, makes sure it's min/max are valid */
@@ -282,14 +305,13 @@ export class Utils {
   static removeInternalAndSame(a: unknown, b: unknown):void {
     if (typeof a !== 'object' || typeof b !== 'object') return;
     for (let key in a) {
-      let val = a[key];
-      if (key[0] === '_' || val === b[key]) {
+      const aVal = a[key];
+      const bVal = b[key];
+      if (key[0] === '_' || aVal === bVal) {
         delete a[key]
-      } else if (val && typeof val === 'object' && b[key] !== undefined) {
-        for (let i in val) {
-          if (val[i] === b[key][i] || i[0] === '_') { delete val[i] }
-        }
-        if (!Object.keys(val).length) { delete a[key] }
+      } else if (aVal && typeof aVal === 'object' && bVal !== undefined) {
+        Utils.removeInternalAndSame(aVal, bVal);
+        if (!Object.keys(aVal).length) { delete a[key] }
       }
     }
   }
@@ -309,13 +331,13 @@ export class Utils {
   }
 
   /** return the closest parent (or itself) matching the given class */
-  static closestUpByClass(el: HTMLElement, name: string): HTMLElement {
-    while (el) {
-      if (el.classList.contains(name)) return el;
-      el = el.parentElement
-    }
-    return null;
-  }
+  // static closestUpByClass(el: HTMLElement, name: string): HTMLElement {
+  //   while (el) {
+  //     if (el.classList.contains(name)) return el;
+  //     el = el.parentElement
+  //   }
+  //   return null;
+  // }
 
   /** delay calling the given function for given delay, preventing new calls from happening while waiting */
   static throttle(func: () => void, delay: number): () => void {
@@ -476,7 +498,7 @@ export class Utils {
   }
 
   // public static setPositionRelative(el: HTMLElement): void {
-  //   if (!(/^(?:r|a|f)/).test(window.getComputedStyle(el).position)) {
+  //   if (!(/^(?:r|a|f)/).test(getComputedStyle(el).position)) {
   //     el.style.position = "relative";
   //   }
   // }
@@ -508,10 +530,6 @@ export class Utils {
       cancelable: true,
       target: info.target ? info.target : e.target
     };
-    // don't check for `instanceof DragEvent` as Safari use MouseEvent #1540
-    if ((e as DragEvent).dataTransfer) {
-      evt['dataTransfer'] = (e as DragEvent).dataTransfer; // workaround 'readonly' field.
-    }
     ['altKey','ctrlKey','metaKey','shiftKey'].forEach(p => evt[p] = e[p]); // keys
     ['pageX','pageY','clientX','clientY','screenX','screenY'].forEach(p => evt[p] = e[p]); // point info
     return {...evt, ...obj} as unknown as T;
@@ -540,6 +558,39 @@ export class Utils {
     (target || e.target).dispatchEvent(simulatedEvent);
   }
 
+  /**
+   * defines an element that is used to get the offset and scale from grid transforms
+   * returns the scale and offsets from said element
+  */
+  public static getValuesFromTransformedElement(parent: HTMLElement): DragTransform {
+    const transformReference = document.createElement('div');
+    Utils.addElStyles(transformReference, {
+      opacity: '0',
+      position: 'fixed',
+      top: 0 + 'px',
+      left: 0 + 'px',
+      width: '1px',
+      height: '1px',
+      zIndex: '-999999',
+    });
+    parent.appendChild(transformReference);
+    const transformValues = transformReference.getBoundingClientRect();
+    parent.removeChild(transformReference);
+    transformReference.remove();
+    return {
+      xScale: 1 / transformValues.width,
+      yScale: 1 / transformValues.height,
+      xOffset: transformValues.left,
+      yOffset: transformValues.top,
+    }
+  }
+
+  /** swap the given object 2 field values */
+  public static swap(o: unknown, a: string, b: string): void {
+    if (!o) return;
+    const tmp = o[a]; o[a] = o[b]; o[b] = tmp;
+  }
+
   /** returns true if event is inside the given element rectangle */
   // Note: Safari Mac has null event.relatedTarget which causes #1684 so check if DragEvent is inside the coordinates instead
   //    this.el.contains(event.relatedTarget as HTMLElement)
@@ -552,4 +603,9 @@ export class Utils {
   //   }
   //   return el.contains(target);
   // }
+
+  /** true if the item can be rotated (checking for prop, not space available) */
+  public static canBeRotated(n: GridStackNode): boolean {
+    return !(!n || n.w === n.h || n.locked || n.noResize || n.grid?.opts.disableResize || (n.minW && n.minW === n.maxW) || (n.minH && n.minH === n.maxH));
+  }
 }

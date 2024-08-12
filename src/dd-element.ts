@@ -1,5 +1,5 @@
 /**
- * dd-elements.ts 8.3.0-dev
+ * dd-elements.ts 10.3.1-dev
  * Copyright (c) 2021 Alain Dumesny - see GridStack root license
  */
 
@@ -19,14 +19,11 @@ export class DDElement {
     return el.ddElement;
   }
 
-  public el: DDElementHost;
   public ddDraggable?: DDDraggable;
   public ddDroppable?: DDDroppable;
   public ddResizable?: DDResizable;
 
-  constructor(el: DDElementHost) {
-    this.el = el;
-  }
+  constructor(public el: DDElementHost) {}
 
   public on(eventName: string, callback: (event: MouseEvent) => void): DDElement {
     if (this.ddDraggable && ['drag', 'dragstart', 'dragstop'].indexOf(eventName) > -1) {

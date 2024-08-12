@@ -15,7 +15,7 @@ If you find this lib useful, please donate [PayPal](https://www.paypal.me/alaind
 [![Donate](https://img.shields.io/badge/Donate-PayPal-green.svg)](https://www.paypal.me/alaind831)
 [![Donate](https://img.shields.io/badge/Donate-Venmo-g.svg)](https://www.venmo.com/adumesny)
 
-Join us on Slack: [https://gridstackjs.slack.com](https://join.slack.com/t/gridstackjs/shared_invite/zt-1jobnclsy-FqGGeLX5dFPM_ZQzTunBsw)
+Join us on Slack: [https://gridstackjs.slack.com](https://join.slack.com/t/gridstackjs/shared_invite/zt-27q0rwf80-5vCt81Z_hfVgpRW7L17MnQ)
 
 <!-- [![Slack Status](https://gridstackjs.com/badge.svg)](https://gridstackjs.slack.com) -->
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
@@ -45,6 +45,8 @@ Join us on Slack: [https://gridstackjs.slack.com](https://join.slack.com/t/grids
   - [Migrating to v6](#migrating-to-v6)
   - [Migrating to v7](#migrating-to-v7)
   - [Migrating to v8](#migrating-to-v8)
+  - [Migrating to v9](#migrating-to-v9)
+  - [Migrating to v10](#migrating-to-v10)
 - [jQuery Application](#jquery-application)
 - [Changes](#changes)
 - [The Team](#the-team)
@@ -175,7 +177,7 @@ grid.printCount();
 
 ## Extend Engine
 
-You can now (5.1+) easily create your own layout engine to further customize you usage. Here is a typescript example
+You can now (5.1+) easily create your own layout engine to further customize your usage. Here is a typescript example
 
 ```ts
 import { GridStack, GridStackEngine, GridStackNod, GridStackMoveOpts } from 'gridstack';
@@ -183,7 +185,7 @@ import { GridStack, GridStackEngine, GridStackNod, GridStackMoveOpts } from 'gri
 class CustomEngine extends GridStackEngine {
 
   /** refined this to move the node to the given new location */
-  public moveNode(node: GridStackNode, o: GridStackMoveOpts): boolean {
+  public override moveNode(node: GridStackNode, o: GridStackMoveOpts): boolean {
     // keep the same original X and Width and let base do it all...
     o.x = node.x;
     o.w = node.w;
@@ -442,6 +444,21 @@ Possible breaking change if you use nested grid JSON format, or original Angular
 * removed `GridStackOptions.dragInOptions` since `GridStack.setupDragIn()` has it replaced since 4.0
 * remove `GridStackOptions.minWidth` obsolete since 5.1, use `oneColumnSize` instead
 * CSS rules removed `.grid-stack` prefix for anything already gs based, 12 column (default) now uses `.gs-12`, extra.css is less than 1/4th it original size!, `gs-min|max_w|h` attribute no longer written (but read)
+
+## Migrating to v9
+
+New addition - see release notes about `sizeToContent` feature.
+Possible break:
+* `GridStack.onParentResize()` is now called `onResize()` as grid now directly track size change, no longer involving parent per say to tell us anything. Note sure why it was public.
+
+## Migrating to v10
+
+we now support much richer responsive behavior with `GridStackOptions.columnOpts` including any breakpoint width:column pairs, or automatic column sizing.
+
+breaking change: 
+* `disableOneColumnMode`, `oneColumnSize` have been removed (thought we temporary convert if you have them). use `columnOpts: { breakpoints: [{w:768, c:1}] }` for the same behavior.
+* 1 column mode switch is no longer by default (`columnOpts` is not defined) as too many new users had issues. Instead set it explicitly (see above).
+* `oneColumnModeDomSort` has been removed. Planning to support per column layouts at some future times. TBD
 
 # jQuery Application
 
