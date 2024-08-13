@@ -2537,8 +2537,9 @@ export class GridStack {
       }
 
       // get new position taking into account the margin in the direction we are moving! (need to pass mid point by margin)
-      let left = ui.position.left + (ui.position.left > node._lastUiPosition?.left ? -mRight : mLeft);
-      let top = ui.position.top + (ui.position.top > node._lastUiPosition?.top ? -mBottom : mTop);
+      console.log('NODE', node)
+      let left = ui.position.left + (ui.position.left > (node._lastUiPosition?.left ?? 0) ? -mRight : mLeft);
+      let top = ui.position.top + (ui.position.top > (node._lastUiPosition?.top ?? 0) ? -mBottom : mTop);
       p.x = Math.round(left / cellWidth);
       p.y = Math.round(top / cellHeight);
 

@@ -2435,7 +2435,7 @@ var GridStack = exports.GridStack = /** @class */ (function () {
     };
     /** @internal handles actual drag/resize */
     GridStack.prototype._dragOrResize = function (el, event, ui, node, cellWidth, cellHeight) {
-        var _a, _b;
+        var _a, _b, _c, _d;
         var p = __assign({}, node._orig); // could be undefined (_isExternal) which is ok (drag only set x,y and w,h will default to node value)
         var resizing;
         var mLeft = this.opts.marginLeft, mRight = this.opts.marginRight, mTop = this.opts.marginTop, mBottom = this.opts.marginBottom;
@@ -2454,8 +2454,9 @@ var GridStack = exports.GridStack = /** @class */ (function () {
                 utils_1.Utils.updateScrollPosition(el, ui.position, distance);
             }
             // get new position taking into account the margin in the direction we are moving! (need to pass mid point by margin)
-            var left = ui.position.left + (ui.position.left > ((_a = node._lastUiPosition) === null || _a === void 0 ? void 0 : _a.left) ? -mRight : mLeft);
-            var top_2 = ui.position.top + (ui.position.top > ((_b = node._lastUiPosition) === null || _b === void 0 ? void 0 : _b.top) ? -mBottom : mTop);
+            console.log('NODE', node);
+            var left = ui.position.left + (ui.position.left > ((_b = (_a = node._lastUiPosition) === null || _a === void 0 ? void 0 : _a.left) !== null && _b !== void 0 ? _b : 0) ? -mRight : mLeft);
+            var top_2 = ui.position.top + (ui.position.top > ((_d = (_c = node._lastUiPosition) === null || _c === void 0 ? void 0 : _c.top) !== null && _d !== void 0 ? _d : 0) ? -mBottom : mTop);
             p.x = Math.round(left / cellWidth);
             p.y = Math.round(top_2 / cellHeight);
             // @ts-ignore// if we're at the bottom hitting something else, grow the grid so cursor doesn't leave when trying to place below others
