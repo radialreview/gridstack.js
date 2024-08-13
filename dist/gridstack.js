@@ -2327,7 +2327,7 @@ class GridStack {
     }
     /** @internal handles actual drag/resize */
     _dragOrResize(el, event, ui, node, cellWidth, cellHeight) {
-        var _a;
+        var _a, _b;
         let p = Object.assign({}, node._orig); // could be undefined (_isExternal) which is ok (drag only set x,y and w,h will default to node value)
         let resizing;
         let mLeft = this.opts.marginLeft, mRight = this.opts.marginRight, mTop = this.opts.marginTop, mBottom = this.opts.marginBottom;
@@ -2347,7 +2347,7 @@ class GridStack {
             }
             // get new position taking into account the margin in the direction we are moving! (need to pass mid point by margin)
             let left = ui.position.left + (ui.position.left > ((_a = node._lastUiPosition) === null || _a === void 0 ? void 0 : _a.left) ? -mRight : mLeft);
-            let top = ui.position.top + (ui.position.top > node._lastUiPosition.top ? -mBottom : mTop);
+            let top = ui.position.top + (ui.position.top > ((_b = node._lastUiPosition) === null || _b === void 0 ? void 0 : _b.top) ? -mBottom : mTop);
             p.x = Math.round(left / cellWidth);
             p.y = Math.round(top / cellHeight);
             // @ts-ignore// if we're at the bottom hitting something else, grow the grid so cursor doesn't leave when trying to place below others
