@@ -1,12 +1,12 @@
 /**
- * dd-draggable.ts 8.3.0-dev
+ * dd-draggable.ts 10.3.1-dev
  * Copyright (c) 2021-2022 Alain Dumesny - see GridStack root license
  */
 
 import { DDManager } from './dd-manager';
-import { Utils } from './utils';
+import { DragTransform, Utils } from './utils';
 import { DDBaseImplement, HTMLElementExtendOpt } from './dd-base-impl';
-import { GridItemHTMLElement, DDUIData } from './types';
+import { GridItemHTMLElement, DDUIData, GridStackNode, GridStackPosition } from './types';
 import { DDElementHost } from './dd-element';
 import { isTouch, touchend, touchmove, touchstart, pointerdown } from './dd-touch';
 
@@ -33,6 +33,10 @@ interface DragOffset {
   offsetTop: number;
 }
 
+interface GridStackNodeRotate extends GridStackNode {
+  _origRotate?: GridStackPosition;
+}
+
 type DDDragEvent = 'drag' | 'dragstart' | 'dragstop';
 
 // make sure we are not clicking on known object that handles mouseDown
@@ -41,8 +45,6 @@ const skipMouseDown = 'input,textarea,button,select,option,[contenteditable="tru
 // let count = 0; // TEST
 
 export class DDDraggable extends DDBaseImplement implements HTMLElementExtendOpt<DDDraggableOpt> {
-  public el: HTMLElement;
-  public option: DDDraggableOpt;
   public helper: HTMLElement; // used by GridStackDDNative
 
   /** @internal */
@@ -52,9 +54,11 @@ export class DDDraggable extends DDBaseImplement implements HTMLElementExtendOpt
   /** @internal */
   protected dragElementOriginStyle: Array<string>;
   /** @internal */
-  protected dragEl: HTMLElement;
+  protected dragEls: HTMLElement[];
   /** @internal true while we are dragging an item around */
   protected dragging: boolean;
+  /** @internal last drag event */
+  protected lastDrag: DragEvent;
   /** @internal */
   protected parentOriginStylePosition: string;
   /** @internal */
@@ -63,19 +67,29 @@ export class DDDraggable extends DDBaseImplement implements HTMLElementExtendOpt
   protected static originStyleProp = ['transition', 'pointerEvents', 'position', 'left', 'top', 'minWidth', 'willChange'];
   /** @internal pause before we call the actual drag hit collision code */
   protected dragTimeout: number;
+  /** @internal */
+  protected dragTransform: DragTransform = {
+    xScale: 1,
+    yScale: 1,
+    xOffset: 0,
+    yOffset: 0
+  };
 
-  constructor(el: HTMLElement, option: DDDraggableOpt = {}) {
+  constructor(public el: GridItemHTMLElement, public option: DDDraggableOpt = {}) {
     super();
-    this.el = el;
-    this.option = option;
 
     // get the element that is actually supposed to be dragged by
-    let handleName = option.handle.substring(1);
-    this.dragEl = el.classList.contains(handleName) ? el : el.querySelector(option.handle) || el;
+    const handleName = option.handle.substring(1);
+    const n = el.gridstackNode;
+    this.dragEls = el.classList.contains(handleName) ? [el] : (n?.subGrid ? [el.querySelector(option.handle) || el] : Array.from(el.querySelectorAll(option.handle)));
+    if (this.dragEls.length === 0) {
+      this.dragEls = [el];
+    }
     // create var event binding so we can easily remove and still look like TS methods (unlike anonymous functions)
     this._mouseDown = this._mouseDown.bind(this);
     this._mouseMove = this._mouseMove.bind(this);
     this._mouseUp = this._mouseUp.bind(this);
+    this._keyEvent = this._keyEvent.bind(this);
     this.enable();
   }
 
@@ -90,30 +104,34 @@ export class DDDraggable extends DDBaseImplement implements HTMLElementExtendOpt
   public enable(): void {
     if (this.disabled === false) return;
     super.enable();
-    this.dragEl.addEventListener('mousedown', this._mouseDown);
-    if (isTouch) {
-      this.dragEl.addEventListener('touchstart', touchstart);
-      this.dragEl.addEventListener('pointerdown', pointerdown);
-      // this.dragEl.style.touchAction = 'none'; // not needed unlike pointerdown doc comment
-    }
+    this.dragEls.forEach(dragEl => {
+      dragEl.addEventListener('mousedown', this._mouseDown);
+      if (isTouch) {
+        dragEl.addEventListener('touchstart', touchstart);
+        dragEl.addEventListener('pointerdown', pointerdown);
+        // dragEl.style.touchAction = 'none'; // not needed unlike pointerdown doc comment
+      }
+    });
     this.el.classList.remove('ui-draggable-disabled');
   }
 
   public disable(forDestroy = false): void {
     if (this.disabled === true) return;
     super.disable();
-    this.dragEl.removeEventListener('mousedown', this._mouseDown);
-    if (isTouch) {
-      this.dragEl.removeEventListener('touchstart', touchstart);
-      this.dragEl.removeEventListener('pointerdown', pointerdown);
-    }
+    this.dragEls.forEach(dragEl => {
+      dragEl.removeEventListener('mousedown', this._mouseDown);
+      if (isTouch) {
+        dragEl.removeEventListener('touchstart', touchstart);
+        dragEl.removeEventListener('pointerdown', pointerdown);
+      }
+    });
     if (!forDestroy) this.el.classList.add('ui-draggable-disabled');
   }
 
   public destroy(): void {
     if (this.dragTimeout) window.clearTimeout(this.dragTimeout);
     delete this.dragTimeout;
-    if (this.dragging) this._mouseUp(this.mouseDownEvent);
+    if (this.mouseDownEvent) this._mouseUp(this.mouseDownEvent);
     this.disable(true);
     delete this.el;
     delete this.helper;
@@ -133,7 +151,7 @@ export class DDDraggable extends DDBaseImplement implements HTMLElementExtendOpt
     if (e.button !== 0) return true; // only left click
 
     // make sure we are not clicking on known object that handles mouseDown, or ones supplied by the user
-    if ((e.target as HTMLElement).closest(skipMouseDown)) return true;
+    if (!this.dragEls.find(el => el === e.target) && (e.target as HTMLElement).closest(skipMouseDown)) return true;
     if (this.option.cancel) {
       if ((e.target as HTMLElement).closest(this.option.cancel)) return true;
     }
@@ -151,11 +169,11 @@ export class DDDraggable extends DDBaseImplement implements HTMLElementExtendOpt
     delete DDManager.dragElement;
     delete DDManager.dropElement;
     // document handler so we can continue receiving moves as the item is 'fixed' position, and capture=true so WE get a first crack
-    document.addEventListener('mousemove', this._mouseMove, true); // true=capture, not bubble
+    document.addEventListener('mousemove', this._mouseMove, { capture: true, passive: true }); // true=capture, not bubble
     document.addEventListener('mouseup', this._mouseUp, true);
     if (isTouch) {
-      this.dragEl.addEventListener('touchmove', touchmove);
-      this.dragEl.addEventListener('touchend', touchend);
+      e.target.addEventListener('touchmove', touchmove);
+      e.target.addEventListener('touchend', touchend);
     }
 
     e.preventDefault();
@@ -181,6 +199,7 @@ export class DDDraggable extends DDBaseImplement implements HTMLElementExtendOpt
   protected _mouseMove(e: DragEvent): boolean {
     // console.log(`${count++} move ${e.x},${e.y}`)
     let s = this.mouseDownEvent;
+    this.lastDrag = e;
 
     if (this.dragging) {
       this._dragFollow(e);
@@ -199,7 +218,7 @@ export class DDDraggable extends DDBaseImplement implements HTMLElementExtendOpt
       this.dragging = true;
       DDManager.dragElement = this;
       // if we're dragging an actual grid item, set the current drop as the grid (to detect enter/leave)
-      let grid = (this.el as GridItemHTMLElement).gridstackNode?.grid;
+      let grid = this.el.gridstackNode?.grid;
       if (grid) {
         DDManager.dropElement = (grid.el as DDElementHost).ddElement.ddDroppable;
       } else {
@@ -207,16 +226,19 @@ export class DDDraggable extends DDBaseImplement implements HTMLElementExtendOpt
       }
       this.helper = this._createHelper(e);
       this._setupHelperContainmentStyle();
+      this.dragTransform = Utils.getValuesFromTransformedElement(this.helperContainment);
       this.dragOffset = this._getDragOffset(e, this.el, this.helperContainment);
-      const ev = Utils.initEvent<DragEvent>(e, { target: this.el, type: 'dragstart' });
-
       this._setupHelperStyle(e);
+
+      const ev = Utils.initEvent<DragEvent>(e, { target: this.el, type: 'dragstart' });
       if (this.option.start) {
         this.option.start(ev, this.ui());
       }
       this.triggerEvent('dragstart', ev);
+      // now track keyboard events to cancel or rotate
+      document.addEventListener('keydown', this._keyEvent);
     }
-    e.preventDefault(); // needed otherwise we get text sweep text selection as we drag around
+    // e.preventDefault(); // passive = true. OLD: was needed otherwise we get text sweep text selection as we drag around
     return true;
   }
 
@@ -225,11 +247,13 @@ export class DDDraggable extends DDBaseImplement implements HTMLElementExtendOpt
     document.removeEventListener('mousemove', this._mouseMove, true);
     document.removeEventListener('mouseup', this._mouseUp, true);
     if (isTouch) {
-      this.dragEl.removeEventListener('touchmove', touchmove, true);
-      this.dragEl.removeEventListener('touchend', touchend, true);
+      e.target.removeEventListener('touchmove', touchmove, true);
+      e.target.removeEventListener('touchend', touchend, true);
     }
     if (this.dragging) {
       delete this.dragging;
+      delete (this.el.gridstackNode as GridStackNodeRotate)?._origRotate;
+      document.removeEventListener('keydown', this._keyEvent);
 
       // reset the drop target if dragging over ourself (already parented, just moving during stop callback below)
       if (DDManager.dropElement?.el === this.el.parentElement) {
@@ -259,6 +283,36 @@ export class DDDraggable extends DDBaseImplement implements HTMLElementExtendOpt
     delete DDManager.dropElement;
     delete DDManager.mouseHandled;
     e.preventDefault();
+  }
+
+  /** @internal call when keys are being pressed - use Esc to cancel, R to rotate */
+  protected _keyEvent(e: KeyboardEvent): void {
+    const n = this.el.gridstackNode as GridStackNodeRotate;
+    if (!n?.grid) return;
+    const grid = n.grid;
+
+    if (e.key === 'Escape') {
+      if (n._origRotate) {
+        n._orig = n._origRotate;
+        delete n._origRotate;
+      }
+      grid.engine.restoreInitial();
+      this._mouseUp(this.mouseDownEvent);
+    } else if (e.key === 'r' || e.key === 'R') {
+      if (!Utils.canBeRotated(n)) return;
+      n._origRotate = n._origRotate || { ...n._orig }; // store the real orig size in case we Esc after doing rotation
+      delete n._moving; // force rotate to happen (move waits for >50% coverage otherwise)
+      grid.setAnimation(false) // immediate rotate so _getDragOffset() gets the right dom size below
+        .rotate(n.el, { top: -this.dragOffset.offsetTop, left: -this.dragOffset.offsetLeft })
+        .setAnimation();
+      n._moving = true;
+      this.dragOffset = this._getDragOffset(this.lastDrag, n.el, this.helperContainment);
+      this.helper.style.width = this.dragOffset.width + 'px';
+      this.helper.style.height = this.dragOffset.height + 'px';
+      Utils.swap(n._orig, 'w', 'h');
+      delete n._rect;
+      this._mouseMove(this.lastDrag);
+    }
   }
 
   /** @internal create a clone copy (or user defined method) of the original drag item if set */
@@ -329,8 +383,8 @@ export class DDDraggable extends DDBaseImplement implements HTMLElementExtendOpt
     // }
     const style = this.helper.style;
     const offset = this.dragOffset;
-    style.left = e.clientX + offset.offsetLeft - containmentRect.left + 'px';
-    style.top = e.clientY + offset.offsetTop - containmentRect.top + 'px';
+    style.left = (e.clientX + offset.offsetLeft - containmentRect.left) * this.dragTransform.xScale + 'px';
+    style.top = (e.clientY + offset.offsetTop - containmentRect.top) * this.dragTransform.yScale + 'px';
   }
 
   /** @internal */
@@ -338,7 +392,7 @@ export class DDDraggable extends DDBaseImplement implements HTMLElementExtendOpt
     this.helperContainment = this.helper.parentElement;
     if (this.helper.style.position !== 'fixed') {
       this.parentOriginStylePosition = this.helperContainment.style.position;
-      if (window.getComputedStyle(this.helperContainment).position.match(/static/)) {
+      if (getComputedStyle(this.helperContainment).position.match(/static/)) {
         this.helperContainment.style.position = 'relative';
       }
     }
@@ -352,22 +406,8 @@ export class DDDraggable extends DDBaseImplement implements HTMLElementExtendOpt
     let xformOffsetX = 0;
     let xformOffsetY = 0;
     if (parent) {
-      const testEl = document.createElement('div');
-      Utils.addElStyles(testEl, {
-        opacity: '0',
-        position: 'fixed',
-        top: 0 + 'px',
-        left: 0 + 'px',
-        width: '1px',
-        height: '1px',
-        zIndex: '-999999',
-      });
-      parent.appendChild(testEl);
-      const testElPosition = testEl.getBoundingClientRect();
-      parent.removeChild(testEl);
-      xformOffsetX = testElPosition.left;
-      xformOffsetY = testElPosition.top;
-      // TODO: scale ?
+      xformOffsetX = this.dragTransform.xOffset;
+      xformOffsetY = this.dragTransform.yOffset;
     }
 
     const targetOffset = el.getBoundingClientRect();
@@ -376,8 +416,8 @@ export class DDDraggable extends DDBaseImplement implements HTMLElementExtendOpt
       top: targetOffset.top,
       offsetLeft: - event.clientX + targetOffset.left - xformOffsetX,
       offsetTop: - event.clientY + targetOffset.top - xformOffsetY,
-      width: targetOffset.width,
-      height: targetOffset.height
+      width: targetOffset.width * this.dragTransform.xScale,
+      height: targetOffset.height * this.dragTransform.yScale
     };
   }
 
@@ -388,8 +428,8 @@ export class DDDraggable extends DDBaseImplement implements HTMLElementExtendOpt
     const offset = this.helper.getBoundingClientRect();
     return {
       position: { //Current CSS position of the helper as { top, left } object
-        top: offset.top - containmentRect.top,
-        left: offset.left - containmentRect.left
+        top: (offset.top - containmentRect.top) * this.dragTransform.yScale,
+        left: (offset.left - containmentRect.left) * this.dragTransform.xScale
       }
       /* not used by GridStack for now...
       helper: [this.helper], //The object arr representing the helper that's being dragged.

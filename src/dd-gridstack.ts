@@ -1,5 +1,5 @@
 /**
- * dd-gridstack.ts 8.3.0-dev
+ * dd-gridstack.ts 10.3.1-dev
  * Copyright (c) 2021 Alain Dumesny - see GridStack root license
  */
 
@@ -18,7 +18,7 @@ export type DDDropOpt = {
 /** drag&drop options currently called from the main code, but others can be passed in grid options */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type DDOpts = 'enable' | 'disable' | 'destroy' | 'option' | string | any;
-export type DDKey = 'minWidth' | 'minHeight' | 'maxWidth' | 'maxHeight';
+export type DDKey = 'minWidth' | 'minHeight' | 'maxWidth' | 'maxHeight' | 'maxHeightMoveUp' | 'maxWidthMoveLeft';
 export type DDValue = number | string;
 
 /** drag&drop events callbacks */
@@ -40,9 +40,18 @@ export class DDGridStack {
       } else if (opts === 'option') {
         dEl.setupResizable({ [key]: value });
       } else {
-        const grid = dEl.el.gridstackNode.grid;
-        let handles = dEl.el.getAttribute('gs-resize-handles') ? dEl.el.getAttribute('gs-resize-handles') : grid.opts.resizable.handles;
-        let autoHide = !grid.opts.alwaysShowResizeHandle;
+        const n = dEl.el.gridstackNode;
+        const grid = n.grid;
+        let handles = dEl.el.getAttribute('gs-resize-handles') || grid.opts.resizable.handles || 'e,s,se';
+        if (handles === 'all') handles = 'n,e,s,w,se,sw,ne,nw';
+        // NOTE: keep the resize handles as e,w don't have enough space (10px) to show resize corners anyway. limit during drag instead
+        // restrict vertical resize if height is done to match content anyway... odd to have it spring back
+        // if (Utils.shouldSizeToContent(n, true)) {
+        //   const doE = handles.indexOf('e') !== -1;
+        //   const doW = handles.indexOf('w') !== -1;
+        //   handles = doE ? (doW ? 'e,w' : 'e') : (doW ? 'w' : '');
+        // }
+        const autoHide = !grid.opts.alwaysShowResizeHandle;
         dEl.setupResizable({
           ...grid.opts.resizable,
           ...{ handles, autoHide },
@@ -70,7 +79,7 @@ export class DDGridStack {
         dEl.setupDraggable({
           ...grid.opts.draggable,
           ...{
-            // containment: (grid.parentGridItem && !grid.opts.dragOut) ? grid.el.parentElement : (grid.opts.draggable.containment || null),
+            // containment: (grid.parentGridItem && grid.opts.dragOut === false) ? grid.el.parentElement : (grid.opts.draggable.containment || null),
             start: opts.start,
             stop: opts.stop,
             drag: opts.drag

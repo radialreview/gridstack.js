@@ -1,5 +1,5 @@
 /**
- * dd-droppable.ts 8.3.0-dev
+ * dd-droppable.ts 10.3.1-dev
  * Copyright (c) 2021-2022 Alain Dumesny - see GridStack root license
  */
 
@@ -23,13 +23,9 @@ export interface DDDroppableOpt {
 export class DDDroppable extends DDBaseImplement implements HTMLElementExtendOpt<DDDroppableOpt> {
 
   public accept: (el: HTMLElement) => boolean;
-  public el: HTMLElement;
-  public option: DDDroppableOpt;
 
-  constructor(el: HTMLElement, opts: DDDroppableOpt = {}) {
+  constructor(public el: HTMLElement, public option: DDDroppableOpt = {}) {
     super();
-    this.el = el;
-    this.option = opts;
     // create var event binding so we can easily remove and still look like TS methods (unlike anonymous functions)
     this._mouseEnter = this._mouseEnter.bind(this);
     this._mouseLeave = this._mouseLeave.bind(this);
@@ -94,7 +90,7 @@ export class DDDroppable extends DDBaseImplement implements HTMLElementExtendOpt
 
     // make sure when we enter this, that the last one gets a leave FIRST to correctly cleanup as we don't always do
     if (DDManager.dropElement && DDManager.dropElement !== this) {
-      DDManager.dropElement._mouseLeave(e as DragEvent);
+      DDManager.dropElement._mouseLeave(e as DragEvent, true); // calledByEnter = true
     }
     DDManager.dropElement = this;
 
@@ -108,7 +104,7 @@ export class DDDroppable extends DDBaseImplement implements HTMLElementExtendOpt
   }
 
   /** @internal called when the item is leaving our area, stop tracking if we had moving item */
-  protected _mouseLeave(e: MouseEvent): void {
+  protected _mouseLeave(e: MouseEvent, calledByEnter = false): void {
     // console.log(`${count++} Leave ${this.el.id || (this.el as GridHTMLElement).gridstack.opts.id}`); // TEST
     if (!DDManager.dragElement || DDManager.dropElement !== this) return;
     e.preventDefault();
@@ -125,14 +121,16 @@ export class DDDroppable extends DDBaseImplement implements HTMLElementExtendOpt
       // console.log('not tracking'); // TEST
 
       // if we're still over a parent droppable, send it an enter as we don't get one from leaving nested children
-      let parentDrop: DDDroppable;
-      let parent: DDElementHost = this.el.parentElement;
-      while (!parentDrop && parent) {
-        parentDrop = parent.ddElement?.ddDroppable;
-        parent = parent.parentElement;
-      }
-      if (parentDrop) {
-        parentDrop._mouseEnter(e);
+      if (!calledByEnter) {
+        let parentDrop: DDDroppable;
+        let parent: DDElementHost = this.el.parentElement;
+        while (!parentDrop && parent) {
+          parentDrop = parent.ddElement?.ddDroppable;
+          parent = parent.parentElement;
+        }
+        if (parentDrop) {
+          parentDrop._mouseEnter(e);
+        }
       }
     }
   }
@@ -156,7 +154,7 @@ export class DDDroppable extends DDBaseImplement implements HTMLElementExtendOpt
   protected _setupAccept(): DDDroppable {
     if (!this.option.accept) return this;
     if (typeof this.option.accept === 'string') {
-      this.accept = (el: HTMLElement) => el.matches(this.option.accept as string);
+      this.accept = (el: HTMLElement) => el.classList.contains(this.option.accept as string) || el.matches(this.option.accept as string);
     } else {
       this.accept = this.option.accept;
     }
