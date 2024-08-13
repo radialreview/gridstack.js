@@ -1,6 +1,6 @@
 "use strict";
 /**
- * dd-gridstack.ts 8.3.0-dev
+ * dd-gridstack.ts 10.3.1-dev
  * Copyright (c) 2021 Alain Dumesny - see GridStack root license
  */
 var __assign = (this && this.__assign) || function () {
@@ -39,8 +39,18 @@ var DDGridStack = /** @class */ (function () {
                 dEl.setupResizable((_a = {}, _a[key] = value, _a));
             }
             else {
-                var grid = dEl.el.gridstackNode.grid;
-                var handles = dEl.el.getAttribute('gs-resize-handles') ? dEl.el.getAttribute('gs-resize-handles') : grid.opts.resizable.handles;
+                var n = dEl.el.gridstackNode;
+                var grid = n.grid;
+                var handles = dEl.el.getAttribute('gs-resize-handles') || grid.opts.resizable.handles || 'e,s,se';
+                if (handles === 'all')
+                    handles = 'n,e,s,w,se,sw,ne,nw';
+                // NOTE: keep the resize handles as e,w don't have enough space (10px) to show resize corners anyway. limit during drag instead
+                // restrict vertical resize if height is done to match content anyway... odd to have it spring back
+                // if (Utils.shouldSizeToContent(n, true)) {
+                //   const doE = handles.indexOf('e') !== -1;
+                //   const doW = handles.indexOf('w') !== -1;
+                //   handles = doE ? (doW ? 'e,w' : 'e') : (doW ? 'w' : '');
+                // }
                 var autoHide = !grid.opts.alwaysShowResizeHandle;
                 dEl.setupResizable(__assign(__assign(__assign({}, grid.opts.resizable), { handles: handles, autoHide: autoHide }), {
                     start: opts.start,
@@ -66,7 +76,7 @@ var DDGridStack = /** @class */ (function () {
             else {
                 var grid = dEl.el.gridstackNode.grid;
                 dEl.setupDraggable(__assign(__assign({}, grid.opts.draggable), {
-                    // containment: (grid.parentGridItem && !grid.opts.dragOut) ? grid.el.parentElement : (grid.opts.draggable.containment || null),
+                    // containment: (grid.parentGridItem && grid.opts.dragOut === false) ? grid.el.parentElement : (grid.opts.draggable.containment || null),
                     start: opts.start,
                     stop: opts.stop,
                     drag: opts.drag

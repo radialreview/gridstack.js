@@ -1,6 +1,6 @@
 "use strict";
 /**
- * dd-draggable.ts 8.3.0-dev
+ * dd-draggable.ts 10.3.1-dev
  * Copyright (c) 2021-2022 Alain Dumesny - see GridStack root license
  */
 var __extends = (this && this.__extends) || (function () {
@@ -18,6 +18,17 @@ var __extends = (this && this.__extends) || (function () {
         d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
     };
 })();
+var __assign = (this && this.__assign) || function () {
+    __assign = Object.assign || function(t) {
+        for (var s, i = 1, n = arguments.length; i < n; i++) {
+            s = arguments[i];
+            for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p))
+                t[p] = s[p];
+        }
+        return t;
+    };
+    return __assign.apply(this, arguments);
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.DDDraggable = void 0;
 var dd_manager_1 = require("./dd-manager");
@@ -34,13 +45,25 @@ var DDDraggable = exports.DDDraggable = /** @class */ (function (_super) {
         var _this = _super.call(this) || this;
         _this.el = el;
         _this.option = option;
+        /** @internal */
+        _this.dragTransform = {
+            xScale: 1,
+            yScale: 1,
+            xOffset: 0,
+            yOffset: 0
+        };
         // get the element that is actually supposed to be dragged by
         var handleName = option.handle.substring(1);
-        _this.dragEl = el.classList.contains(handleName) ? el : el.querySelector(option.handle) || el;
+        var n = el.gridstackNode;
+        _this.dragEls = el.classList.contains(handleName) ? [el] : ((n === null || n === void 0 ? void 0 : n.subGrid) ? [el.querySelector(option.handle) || el] : Array.from(el.querySelectorAll(option.handle)));
+        if (_this.dragEls.length === 0) {
+            _this.dragEls = [el];
+        }
         // create var event binding so we can easily remove and still look like TS methods (unlike anonymous functions)
         _this._mouseDown = _this._mouseDown.bind(_this);
         _this._mouseMove = _this._mouseMove.bind(_this);
         _this._mouseUp = _this._mouseUp.bind(_this);
+        _this._keyEvent = _this._keyEvent.bind(_this);
         _this.enable();
         return _this;
     }
@@ -51,27 +74,33 @@ var DDDraggable = exports.DDDraggable = /** @class */ (function (_super) {
         _super.prototype.off.call(this, event);
     };
     DDDraggable.prototype.enable = function () {
+        var _this = this;
         if (this.disabled === false)
             return;
         _super.prototype.enable.call(this);
-        this.dragEl.addEventListener('mousedown', this._mouseDown);
-        if (dd_touch_1.isTouch) {
-            this.dragEl.addEventListener('touchstart', dd_touch_1.touchstart);
-            this.dragEl.addEventListener('pointerdown', dd_touch_1.pointerdown);
-            // this.dragEl.style.touchAction = 'none'; // not needed unlike pointerdown doc comment
-        }
+        this.dragEls.forEach(function (dragEl) {
+            dragEl.addEventListener('mousedown', _this._mouseDown);
+            if (dd_touch_1.isTouch) {
+                dragEl.addEventListener('touchstart', dd_touch_1.touchstart);
+                dragEl.addEventListener('pointerdown', dd_touch_1.pointerdown);
+                // dragEl.style.touchAction = 'none'; // not needed unlike pointerdown doc comment
+            }
+        });
         this.el.classList.remove('ui-draggable-disabled');
     };
     DDDraggable.prototype.disable = function (forDestroy) {
+        var _this = this;
         if (forDestroy === void 0) { forDestroy = false; }
         if (this.disabled === true)
             return;
         _super.prototype.disable.call(this);
-        this.dragEl.removeEventListener('mousedown', this._mouseDown);
-        if (dd_touch_1.isTouch) {
-            this.dragEl.removeEventListener('touchstart', dd_touch_1.touchstart);
-            this.dragEl.removeEventListener('pointerdown', dd_touch_1.pointerdown);
-        }
+        this.dragEls.forEach(function (dragEl) {
+            dragEl.removeEventListener('mousedown', _this._mouseDown);
+            if (dd_touch_1.isTouch) {
+                dragEl.removeEventListener('touchstart', dd_touch_1.touchstart);
+                dragEl.removeEventListener('pointerdown', dd_touch_1.pointerdown);
+            }
+        });
         if (!forDestroy)
             this.el.classList.add('ui-draggable-disabled');
     };
@@ -79,7 +108,7 @@ var DDDraggable = exports.DDDraggable = /** @class */ (function (_super) {
         if (this.dragTimeout)
             window.clearTimeout(this.dragTimeout);
         delete this.dragTimeout;
-        if (this.dragging)
+        if (this.mouseDownEvent)
             this._mouseUp(this.mouseDownEvent);
         this.disable(true);
         delete this.el;
@@ -100,7 +129,7 @@ var DDDraggable = exports.DDDraggable = /** @class */ (function (_super) {
         if (e.button !== 0)
             return true; // only left click
         // make sure we are not clicking on known object that handles mouseDown, or ones supplied by the user
-        if (e.target.closest(skipMouseDown))
+        if (!this.dragEls.find(function (el) { return el === e.target; }) && e.target.closest(skipMouseDown))
             return true;
         if (this.option.cancel) {
             if (e.target.closest(this.option.cancel))
@@ -118,11 +147,11 @@ var DDDraggable = exports.DDDraggable = /** @class */ (function (_super) {
         delete dd_manager_1.DDManager.dragElement;
         delete dd_manager_1.DDManager.dropElement;
         // document handler so we can continue receiving moves as the item is 'fixed' position, and capture=true so WE get a first crack
-        document.addEventListener('mousemove', this._mouseMove, true); // true=capture, not bubble
+        document.addEventListener('mousemove', this._mouseMove, { capture: true, passive: true }); // true=capture, not bubble
         document.addEventListener('mouseup', this._mouseUp, true);
         if (dd_touch_1.isTouch) {
-            this.dragEl.addEventListener('touchmove', dd_touch_1.touchmove);
-            this.dragEl.addEventListener('touchend', dd_touch_1.touchend);
+            e.target.addEventListener('touchmove', dd_touch_1.touchmove);
+            e.target.addEventListener('touchend', dd_touch_1.touchend);
         }
         e.preventDefault();
         // preventDefault() prevents blur event which occurs just after mousedown event.
@@ -148,6 +177,7 @@ var DDDraggable = exports.DDDraggable = /** @class */ (function (_super) {
         var _a;
         // console.log(`${count++} move ${e.x},${e.y}`)
         var s = this.mouseDownEvent;
+        this.lastDrag = e;
         if (this.dragging) {
             this._dragFollow(e);
             // delay actual grid handling drag until we pause for a while if set
@@ -177,30 +207,35 @@ var DDDraggable = exports.DDDraggable = /** @class */ (function (_super) {
             }
             this.helper = this._createHelper(e);
             this._setupHelperContainmentStyle();
+            this.dragTransform = utils_1.Utils.getValuesFromTransformedElement(this.helperContainment);
             this.dragOffset = this._getDragOffset(e, this.el, this.helperContainment);
-            var ev = utils_1.Utils.initEvent(e, { target: this.el, type: 'dragstart' });
             this._setupHelperStyle(e);
+            var ev = utils_1.Utils.initEvent(e, { target: this.el, type: 'dragstart' });
             if (this.option.start) {
                 this.option.start(ev, this.ui());
             }
             this.triggerEvent('dragstart', ev);
+            // now track keyboard events to cancel or rotate
+            document.addEventListener('keydown', this._keyEvent);
         }
-        e.preventDefault(); // needed otherwise we get text sweep text selection as we drag around
+        // e.preventDefault(); // passive = true. OLD: was needed otherwise we get text sweep text selection as we drag around
         return true;
     };
     /** @internal call when the mouse gets released to drop the item at current location */
     DDDraggable.prototype._mouseUp = function (e) {
-        var _a;
+        var _a, _b;
         document.removeEventListener('mousemove', this._mouseMove, true);
         document.removeEventListener('mouseup', this._mouseUp, true);
         if (dd_touch_1.isTouch) {
-            this.dragEl.removeEventListener('touchmove', dd_touch_1.touchmove, true);
-            this.dragEl.removeEventListener('touchend', dd_touch_1.touchend, true);
+            e.target.removeEventListener('touchmove', dd_touch_1.touchmove, true);
+            e.target.removeEventListener('touchend', dd_touch_1.touchend, true);
         }
         if (this.dragging) {
             delete this.dragging;
+            (_a = this.el.gridstackNode) === null || _a === void 0 ? true : delete _a._origRotate;
+            document.removeEventListener('keydown', this._keyEvent);
             // reset the drop target if dragging over ourself (already parented, just moving during stop callback below)
-            if (((_a = dd_manager_1.DDManager.dropElement) === null || _a === void 0 ? void 0 : _a.el) === this.el.parentElement) {
+            if (((_b = dd_manager_1.DDManager.dropElement) === null || _b === void 0 ? void 0 : _b.el) === this.el.parentElement) {
                 delete dd_manager_1.DDManager.dropElement;
             }
             this.helperContainment.style.position = this.parentOriginStylePosition || null;
@@ -226,6 +261,37 @@ var DDDraggable = exports.DDDraggable = /** @class */ (function (_super) {
         delete dd_manager_1.DDManager.dropElement;
         delete dd_manager_1.DDManager.mouseHandled;
         e.preventDefault();
+    };
+    /** @internal call when keys are being pressed - use Esc to cancel, R to rotate */
+    DDDraggable.prototype._keyEvent = function (e) {
+        var n = this.el.gridstackNode;
+        if (!(n === null || n === void 0 ? void 0 : n.grid))
+            return;
+        var grid = n.grid;
+        if (e.key === 'Escape') {
+            if (n._origRotate) {
+                n._orig = n._origRotate;
+                delete n._origRotate;
+            }
+            grid.engine.restoreInitial();
+            this._mouseUp(this.mouseDownEvent);
+        }
+        else if (e.key === 'r' || e.key === 'R') {
+            if (!utils_1.Utils.canBeRotated(n))
+                return;
+            n._origRotate = n._origRotate || __assign({}, n._orig); // store the real orig size in case we Esc after doing rotation
+            delete n._moving; // force rotate to happen (move waits for >50% coverage otherwise)
+            grid.setAnimation(false) // immediate rotate so _getDragOffset() gets the right dom size below
+                .rotate(n.el, { top: -this.dragOffset.offsetTop, left: -this.dragOffset.offsetLeft })
+                .setAnimation();
+            n._moving = true;
+            this.dragOffset = this._getDragOffset(this.lastDrag, n.el, this.helperContainment);
+            this.helper.style.width = this.dragOffset.width + 'px';
+            this.helper.style.height = this.dragOffset.height + 'px';
+            utils_1.Utils.swap(n._orig, 'w', 'h');
+            delete n._rect;
+            this._mouseMove(this.lastDrag);
+        }
     };
     /** @internal create a clone copy (or user defined method) of the original drag item if set */
     DDDraggable.prototype._createHelper = function (event) {
@@ -297,15 +363,15 @@ var DDDraggable = exports.DDDraggable = /** @class */ (function (_super) {
         // }
         var style = this.helper.style;
         var offset = this.dragOffset;
-        style.left = e.clientX + offset.offsetLeft - containmentRect.left + 'px';
-        style.top = e.clientY + offset.offsetTop - containmentRect.top + 'px';
+        style.left = (e.clientX + offset.offsetLeft - containmentRect.left) * this.dragTransform.xScale + 'px';
+        style.top = (e.clientY + offset.offsetTop - containmentRect.top) * this.dragTransform.yScale + 'px';
     };
     /** @internal */
     DDDraggable.prototype._setupHelperContainmentStyle = function () {
         this.helperContainment = this.helper.parentElement;
         if (this.helper.style.position !== 'fixed') {
             this.parentOriginStylePosition = this.helperContainment.style.position;
-            if (window.getComputedStyle(this.helperContainment).position.match(/static/)) {
+            if (getComputedStyle(this.helperContainment).position.match(/static/)) {
                 this.helperContainment.style.position = 'relative';
             }
         }
@@ -317,22 +383,8 @@ var DDDraggable = exports.DDDraggable = /** @class */ (function (_super) {
         var xformOffsetX = 0;
         var xformOffsetY = 0;
         if (parent) {
-            var testEl = document.createElement('div');
-            utils_1.Utils.addElStyles(testEl, {
-                opacity: '0',
-                position: 'fixed',
-                top: 0 + 'px',
-                left: 0 + 'px',
-                width: '1px',
-                height: '1px',
-                zIndex: '-999999',
-            });
-            parent.appendChild(testEl);
-            var testElPosition = testEl.getBoundingClientRect();
-            parent.removeChild(testEl);
-            xformOffsetX = testElPosition.left;
-            xformOffsetY = testElPosition.top;
-            // TODO: scale ?
+            xformOffsetX = this.dragTransform.xOffset;
+            xformOffsetY = this.dragTransform.yOffset;
         }
         var targetOffset = el.getBoundingClientRect();
         return {
@@ -340,8 +392,8 @@ var DDDraggable = exports.DDDraggable = /** @class */ (function (_super) {
             top: targetOffset.top,
             offsetLeft: -event.clientX + targetOffset.left - xformOffsetX,
             offsetTop: -event.clientY + targetOffset.top - xformOffsetY,
-            width: targetOffset.width,
-            height: targetOffset.height
+            width: targetOffset.width * this.dragTransform.xScale,
+            height: targetOffset.height * this.dragTransform.yScale
         };
     };
     /** @internal TODO: set to public as called by DDDroppable! */
@@ -351,8 +403,8 @@ var DDDraggable = exports.DDDraggable = /** @class */ (function (_super) {
         var offset = this.helper.getBoundingClientRect();
         return {
             position: {
-                top: offset.top - containmentRect.top,
-                left: offset.left - containmentRect.left
+                top: (offset.top - containmentRect.top) * this.dragTransform.yScale,
+                left: (offset.left - containmentRect.left) * this.dragTransform.xScale
             }
             /* not used by GridStack for now...
             helper: [this.helper], //The object arr representing the helper that's being dragged.

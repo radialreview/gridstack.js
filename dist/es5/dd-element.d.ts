@@ -1,5 +1,5 @@
 /**
- * dd-elements.ts 8.3.0-dev
+ * dd-elements.ts 10.3.1-dev
  * Copyright (c) 2021 Alain Dumesny - see GridStack root license
  */
 import { DDResizable, DDResizableOpt } from './dd-resizable';
@@ -10,8 +10,8 @@ export interface DDElementHost extends GridItemHTMLElement {
     ddElement?: DDElement;
 }
 export declare class DDElement {
-    static init(el: DDElementHost): DDElement;
     el: DDElementHost;
+    static init(el: DDElementHost): DDElement;
     ddDraggable?: DDDraggable;
     ddDroppable?: DDDroppable;
     ddResizable?: DDResizable;

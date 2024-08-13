@@ -1,5 +1,5 @@
 /**
- * dd-gridstack.ts 8.3.0-dev
+ * dd-gridstack.ts 10.3.1-dev
  * Copyright (c) 2021 Alain Dumesny - see GridStack root license
  */
 import { GridItemHTMLElement, GridStackElement, DDDragInOpt } from './types';
@@ -11,7 +11,7 @@ export type DDDropOpt = {
 };
 /** drag&drop options currently called from the main code, but others can be passed in grid options */
 export type DDOpts = 'enable' | 'disable' | 'destroy' | 'option' | string | any;
-export type DDKey = 'minWidth' | 'minHeight' | 'maxWidth' | 'maxHeight';
+export type DDKey = 'minWidth' | 'minHeight' | 'maxWidth' | 'maxHeight' | 'maxHeightMoveUp' | 'maxWidthMoveLeft';
 export type DDValue = number | string;
 /** drag&drop events callbacks */
 export type DDCallback = (event: Event, arg2: GridItemHTMLElement, helper?: GridItemHTMLElement) => void;

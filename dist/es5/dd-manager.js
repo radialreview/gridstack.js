@@ -1,6 +1,6 @@
 "use strict";
 /**
- * dd-manager.ts 8.3.0-dev
+ * dd-manager.ts 10.3.1-dev
  * Copyright (c) 2021 Alain Dumesny - see GridStack root license
  */
 Object.defineProperty(exports, "__esModule", { value: true });

@@ -1,6 +1,6 @@
 "use strict";
 /**
- * dd-droppable.ts 8.3.0-dev
+ * dd-droppable.ts 10.3.1-dev
  * Copyright (c) 2021-2022 Alain Dumesny - see GridStack root license
  */
 var __extends = (this && this.__extends) || (function () {
@@ -38,11 +38,11 @@ var dd_touch_1 = require("./dd-touch");
 // let count = 0; // TEST
 var DDDroppable = /** @class */ (function (_super) {
     __extends(DDDroppable, _super);
-    function DDDroppable(el, opts) {
-        if (opts === void 0) { opts = {}; }
+    function DDDroppable(el, option) {
+        if (option === void 0) { option = {}; }
         var _this = _super.call(this) || this;
         _this.el = el;
-        _this.option = opts;
+        _this.option = option;
         // create var event binding so we can easily remove and still look like TS methods (unlike anonymous functions)
         _this._mouseEnter = _this._mouseEnter.bind(_this);
         _this._mouseLeave = _this._mouseLeave.bind(_this);
@@ -107,7 +107,7 @@ var DDDroppable = /** @class */ (function (_super) {
         e.stopPropagation();
         // make sure when we enter this, that the last one gets a leave FIRST to correctly cleanup as we don't always do
         if (dd_manager_1.DDManager.dropElement && dd_manager_1.DDManager.dropElement !== this) {
-            dd_manager_1.DDManager.dropElement._mouseLeave(e);
+            dd_manager_1.DDManager.dropElement._mouseLeave(e, true); // calledByEnter = true
         }
         dd_manager_1.DDManager.dropElement = this;
         var ev = utils_1.Utils.initEvent(e, { target: this.el, type: 'dropover' });
@@ -119,8 +119,9 @@ var DDDroppable = /** @class */ (function (_super) {
         // console.log('tracking'); // TEST
     };
     /** @internal called when the item is leaving our area, stop tracking if we had moving item */
-    DDDroppable.prototype._mouseLeave = function (e) {
+    DDDroppable.prototype._mouseLeave = function (e, calledByEnter) {
         var _a;
+        if (calledByEnter === void 0) { calledByEnter = false; }
         // console.log(`${count++} Leave ${this.el.id || (this.el as GridHTMLElement).gridstack.opts.id}`); // TEST
         if (!dd_manager_1.DDManager.dragElement || dd_manager_1.DDManager.dropElement !== this)
             return;
@@ -135,14 +136,16 @@ var DDDroppable = /** @class */ (function (_super) {
             delete dd_manager_1.DDManager.dropElement;
             // console.log('not tracking'); // TEST
             // if we're still over a parent droppable, send it an enter as we don't get one from leaving nested children
-            var parentDrop = void 0;
-            var parent_1 = this.el.parentElement;
-            while (!parentDrop && parent_1) {
-                parentDrop = (_a = parent_1.ddElement) === null || _a === void 0 ? void 0 : _a.ddDroppable;
-                parent_1 = parent_1.parentElement;
-            }
-            if (parentDrop) {
-                parentDrop._mouseEnter(e);
+            if (!calledByEnter) {
+                var parentDrop = void 0;
+                var parent_1 = this.el.parentElement;
+                while (!parentDrop && parent_1) {
+                    parentDrop = (_a = parent_1.ddElement) === null || _a === void 0 ? void 0 : _a.ddDroppable;
+                    parent_1 = parent_1.parentElement;
+                }
+                if (parentDrop) {
+                    parentDrop._mouseEnter(e);
+                }
             }
         }
     };
@@ -165,7 +168,7 @@ var DDDroppable = /** @class */ (function (_super) {
         if (!this.option.accept)
             return this;
         if (typeof this.option.accept === 'string') {
-            this.accept = function (el) { return el.matches(_this.option.accept); };
+            this.accept = function (el) { return el.classList.contains(_this.option.accept) || el.matches(_this.option.accept); };
         }
         else {
             this.accept = this.option.accept;

@@ -1,6 +1,6 @@
 "use strict";
 /**
- * dd-resizable.ts 8.3.0-dev
+ * dd-resizable.ts 10.3.1-dev
  * Copyright (c) 2021-2022 Alain Dumesny - see GridStack root license
  */
 var __extends = (this && this.__extends) || (function () {
@@ -26,9 +26,14 @@ var utils_1 = require("./utils");
 var dd_manager_1 = require("./dd-manager");
 var DDResizable = exports.DDResizable = /** @class */ (function (_super) {
     __extends(DDResizable, _super);
-    function DDResizable(el, opts) {
-        if (opts === void 0) { opts = {}; }
+    // have to be public else complains for HTMLElementExtendOpt ?
+    function DDResizable(el, option) {
+        if (option === void 0) { option = {}; }
         var _this = _super.call(this) || this;
+        _this.el = el;
+        _this.option = option;
+        /** @internal */
+        _this.rectScale = { x: 1, y: 1 };
         /** @internal */
         _this._ui = function () {
             var containmentEl = _this.el.parentElement;
@@ -42,12 +47,12 @@ var DDResizable = exports.DDResizable = /** @class */ (function (_super) {
             var rect = _this.temporalRect || newRect;
             return {
                 position: {
-                    left: rect.left - containmentRect.left,
-                    top: rect.top - containmentRect.top
+                    left: (rect.left - containmentRect.left) * _this.rectScale.x,
+                    top: (rect.top - containmentRect.top) * _this.rectScale.y
                 },
                 size: {
-                    width: rect.width,
-                    height: rect.height
+                    width: rect.width * _this.rectScale.x,
+                    height: rect.height * _this.rectScale.y
                 }
                 /* Gridstack ONLY needs position set above... keep around in case.
                 element: [this.el], // The object representing the element to be resized
@@ -64,8 +69,6 @@ var DDResizable = exports.DDResizable = /** @class */ (function (_super) {
                 */
             };
         };
-        _this.el = el;
-        _this.option = opts;
         // create var event binding so we can easily remove and still look like TS methods (unlike anonymous functions)
         _this._mouseOver = _this._mouseOver.bind(_this);
         _this._mouseOut = _this._mouseOut.bind(_this);
@@ -152,11 +155,7 @@ var DDResizable = exports.DDResizable = /** @class */ (function (_super) {
     /** @internal */
     DDResizable.prototype._setupHandlers = function () {
         var _this = this;
-        var handlerDirection = this.option.handles || 'e,s,se';
-        if (handlerDirection === 'all') {
-            handlerDirection = 'n,e,s,w,se,sw,ne,nw';
-        }
-        this.handlers = handlerDirection.split(',')
+        this.handlers = this.option.handles.split(',')
             .map(function (dir) { return dir.trim(); })
             .map(function (dir) { return new dd_resizable_handle_1.DDResizableHandle(_this.el, dir, {
             start: function (event) {
@@ -173,6 +172,7 @@ var DDResizable = exports.DDResizable = /** @class */ (function (_super) {
     };
     /** @internal */
     DDResizable.prototype._resizeStart = function (event) {
+        this.sizeToContent = utils_1.Utils.shouldSizeToContent(this.el.gridstackNode, true); // strick true only and not number
         this.originalRect = this.el.getBoundingClientRect();
         this.scrollEl = utils_1.Utils.getScrollElement(this.el);
         this.scrollY = this.scrollEl.scrollTop;
@@ -221,7 +221,13 @@ var DDResizable = exports.DDResizable = /** @class */ (function (_super) {
         var _this = this;
         this.elOriginStyleVal = DDResizable._originStyleProp.map(function (prop) { return _this.el.style[prop]; });
         this.parentOriginStylePosition = this.el.parentElement.style.position;
-        if (window.getComputedStyle(this.el.parentElement).position.match(/static/)) {
+        var parent = this.el.parentElement;
+        var dragTransform = utils_1.Utils.getValuesFromTransformedElement(parent);
+        this.rectScale = {
+            x: dragTransform.xScale,
+            y: dragTransform.yScale
+        };
+        if (getComputedStyle(this.el.parentElement).position.match(/static/)) {
             this.el.parentElement.style.position = 'relative';
         }
         this.el.style.position = 'absolute';
@@ -247,13 +253,16 @@ var DDResizable = exports.DDResizable = /** @class */ (function (_super) {
             top: this.originalRect.top - this.scrolled
         };
         var offsetX = event.clientX - oEvent.clientX;
-        var offsetY = event.clientY - oEvent.clientY;
+        var offsetY = this.sizeToContent ? 0 : event.clientY - oEvent.clientY; // prevent vert resize
+        var moveLeft;
+        var moveUp;
         if (dir.indexOf('e') > -1) {
             newRect.width += offsetX;
         }
         else if (dir.indexOf('w') > -1) {
             newRect.width -= offsetX;
             newRect.left += offsetX;
+            moveLeft = true;
         }
         if (dir.indexOf('s') > -1) {
             newRect.height += offsetY;
@@ -261,8 +270,9 @@ var DDResizable = exports.DDResizable = /** @class */ (function (_super) {
         else if (dir.indexOf('n') > -1) {
             newRect.height -= offsetY;
             newRect.top += offsetY;
+            moveUp = true;
         }
-        var constrain = this._constrainSize(newRect.width, newRect.height);
+        var constrain = this._constrainSize(newRect.width, newRect.height, moveLeft, moveUp);
         if (Math.round(newRect.width) !== Math.round(constrain.width)) { // round to ignore slight round-off errors
             if (dir.indexOf('w') > -1) {
                 newRect.left += newRect.width - constrain.width;
@@ -278,11 +288,12 @@ var DDResizable = exports.DDResizable = /** @class */ (function (_super) {
         return newRect;
     };
     /** @internal constrain the size to the set min/max values */
-    DDResizable.prototype._constrainSize = function (oWidth, oHeight) {
-        var maxWidth = this.option.maxWidth || Number.MAX_SAFE_INTEGER;
-        var minWidth = this.option.minWidth || oWidth;
-        var maxHeight = this.option.maxHeight || Number.MAX_SAFE_INTEGER;
-        var minHeight = this.option.minHeight || oHeight;
+    DDResizable.prototype._constrainSize = function (oWidth, oHeight, moveLeft, moveUp) {
+        var o = this.option;
+        var maxWidth = (moveLeft ? o.maxWidthMoveLeft : o.maxWidth) || Number.MAX_SAFE_INTEGER;
+        var minWidth = o.minWidth / this.rectScale.x || oWidth;
+        var maxHeight = (moveUp ? o.maxHeightMoveUp : o.maxHeight) || Number.MAX_SAFE_INTEGER;
+        var minHeight = o.minHeight / this.rectScale.y || oHeight;
         var width = Math.min(maxWidth, Math.max(minWidth, oWidth));
         var height = Math.min(maxHeight, Math.max(minHeight, oHeight));
         return { width: width, height: height };
@@ -301,7 +312,8 @@ var DDResizable = exports.DDResizable = /** @class */ (function (_super) {
             return this;
         Object.keys(this.temporalRect).forEach(function (key) {
             var value = _this.temporalRect[key];
-            _this.el.style[key] = value - containmentRect[key] + 'px';
+            var scaleReciprocal = key === 'width' || key === 'left' ? _this.rectScale.x : key === 'height' || key === 'top' ? _this.rectScale.y : 1;
+            _this.el.style[key] = (value - containmentRect[key]) * scaleReciprocal + 'px';
         });
         return this;
     };

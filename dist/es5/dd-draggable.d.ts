@@ -1,9 +1,9 @@
 /**
- * dd-draggable.ts 8.3.0-dev
+ * dd-draggable.ts 10.3.1-dev
  * Copyright (c) 2021-2022 Alain Dumesny - see GridStack root license
  */
 import { DDBaseImplement, HTMLElementExtendOpt } from './dd-base-impl';
-import { DDUIData } from './types';
+import { GridItemHTMLElement, DDUIData } from './types';
 export interface DDDraggableOpt {
     appendTo?: string | HTMLElement;
     handle?: string;
@@ -15,10 +15,10 @@ export interface DDDraggableOpt {
 }
 type DDDragEvent = 'drag' | 'dragstart' | 'dragstop';
 export declare class DDDraggable extends DDBaseImplement implements HTMLElementExtendOpt<DDDraggableOpt> {
-    el: HTMLElement;
+    el: GridItemHTMLElement;
     option: DDDraggableOpt;
     helper: HTMLElement;
-    constructor(el: HTMLElement, option?: DDDraggableOpt);
+    constructor(el: GridItemHTMLElement, option?: DDDraggableOpt);
     on(event: DDDragEvent, callback: (event: DragEvent) => void): void;
     off(event: DDDragEvent): void;
     enable(): void;
