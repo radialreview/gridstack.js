@@ -2536,8 +2536,7 @@ export class GridStack {
         Utils.updateScrollPosition(el, ui.position, distance);
       }
 
-      // get new position taking into account the margin in the direction we are moving! (need to pass mid point by margin)
-      console.log('NODE', node)
+      // get new position taking into account the margin in the direction we are moving! (need to pass mid point by margin)      
       let left = ui.position.left + (ui.position.left > node._lastUiPosition.left ? -mRight : mLeft);
       let top = ui.position.top + (ui.position.top > node._lastUiPosition?.top ? -mBottom : mTop);
       p.x = Math.round(left / cellWidth);
